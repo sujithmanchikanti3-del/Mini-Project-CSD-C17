@@ -1,0 +1,36 @@
+{
+  "name": "security-architecture-assessment",
+  "displayName": "Security Architecture Assessment",
+  "description": "Explainable, STRIDE-based security architecture assessment for VS Code workspaces.",
+  "version": "0.2.0",
+  "publisher": "sujithmanchikanti3-del",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:securityArchitectureAssessment.analyzeProject"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "securityArchitectureAssessment.analyzeProject",
+        "title": "Security Architecture: Analyze Project"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,5 +1,6 @@
 import { promises as fs, Dirent } from 'fs';
 import * as path from 'path';
+import { sanitizeErrorMessage } from '../common/sanitize';
 import {
   CONFIGURATION_FILE_NAMES,
   DEFAULT_EXCLUDED_DIRECTORIES,
@@ -127,5 +128,5 @@ function baseName(relPath: string): string {
 }
 
 function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return sanitizeErrorMessage(error); // no absolute paths in messages or warnings
 }

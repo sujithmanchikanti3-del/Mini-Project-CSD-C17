@@ -1,5 +1,6 @@
 import { DetectedDependency, ManifestParseError, ManifestParser, emptyOutput } from '../types';
-import { describeError, isRecord, stripBom } from './common';
+import { redactCredentials } from '../../../common/sanitize';
+import { isRecord, stripBom } from './common';
 
 const DEPENDENCY_SECTIONS = [
   'dependencies',
@@ -18,7 +19,9 @@ export const parsePackageJson: ManifestParser = (content, source) => {
   try {
     data = JSON.parse(stripBom(content));
   } catch (error) {
-    throw new ManifestParseError(`Invalid JSON: ${describeError(error)}`);
+    // Node's JSON error text can quote a slice of the file (possibly a secret); report only the position.
+    const position = /at position (\d+)/.exec(error instanceof Error ? error.message : '');
+    throw new ManifestParseError(`Invalid JSON (syntax error${position ? ` at position ${position[1]}` : ''})`);
   }
   if (!isRecord(data)) {
     throw new ManifestParseError('package.json root is not a JSON object.');
@@ -59,8 +62,10 @@ function toDependency(name: string, spec: unknown, category: string, source: str
   if (typeof spec !== 'string') {
     return { ...base, version: null, notes: 'unsupported version value type' };
   }
-  const note = specifierNote(spec);
-  return { ...base, version: spec, ...(note ? { notes: note } : {}) };
+  // npm specifiers can embed credentials ("git+https://user:token@host/..."); keep everything else exact.
+  const version = redactCredentials(spec);
+  const notes = [specifierNote(spec), version !== spec ? 'credentials in the specifier were redacted' : undefined].filter(Boolean);
+  return { ...base, version, ...(notes.length > 0 ? { notes: notes.join('; ') } : {}) };
 }
 
 function specifierNote(spec: string): string | undefined {

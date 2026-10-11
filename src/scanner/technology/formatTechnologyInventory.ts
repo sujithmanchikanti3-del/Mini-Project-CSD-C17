@@ -1,3 +1,4 @@
+import { stripControlCharacters } from '../../common/sanitize';
 import { DetectedDependency, TechnologyInventory } from './types';
 
 const RULE = '────────────────────────────';
@@ -47,7 +48,7 @@ export function formatTechnologyReport(inventory: TechnologyInventory): string[]
         ? 'Technology detection completed with warnings.'
         : 'Technology detection completed successfully.'
   );
-  return lines;
+  return lines.map(stripControlCharacters); // names come from the scanned project: no forged lines
 }
 
 /** Short sentence for the notification toast. */

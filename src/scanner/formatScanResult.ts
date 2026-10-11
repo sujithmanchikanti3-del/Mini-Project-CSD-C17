@@ -1,3 +1,4 @@
+import { stripControlCharacters } from '../common/sanitize';
 import { WorkspaceScanResult } from './types';
 
 const RULE = '────────────────────────────';
@@ -9,7 +10,6 @@ export function formatScanReport(result: WorkspaceScanResult): string[] {
     RULE,
     '',
     `Workspace: ${result.workspaceName}`,
-    `Path: ${result.workspacePath}`,
     '',
     'Project Types:',
     ...bullets(result.projectTypes, 'None detected'),
@@ -29,7 +29,7 @@ export function formatScanReport(result: WorkspaceScanResult): string[] {
   }
 
   lines.push('', result.truncated ? 'Workspace scan finished with partial results.' : 'Workspace scan completed successfully.');
-  return lines;
+  return lines.map(stripControlCharacters); // paths come from the scanned project: no forged lines
 }
 
 /** One-line summary for the notification toast. */

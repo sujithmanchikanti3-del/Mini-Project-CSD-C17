@@ -34,6 +34,11 @@ export interface DetectedDependency {
   notes?: string;
 }
 
+/** Where inside a Docker file an image was declared (structured, so later milestones need not parse `notes`). */
+export type TechnologyScope =
+  | { kind: 'build-stage'; index: number } // Dockerfile FROM, 1-based
+  | { kind: 'service'; name: string }; // compose service
+
 /** A runtime / platform / base image the project declares (not a library dependency). */
 export interface DetectedTechnology {
   /** Runtime name or image repository as written ("Node.js", "Python", "node", "postgres"). */
@@ -44,6 +49,8 @@ export interface DetectedTechnology {
   source: string;
   /** Raw declaration, e.g. the image reference "node:20-alpine" or "engines.node". */
   reference?: string;
+  /** Docker images only: the build stage or compose service that declares the image. */
+  scope?: TechnologyScope;
   notes?: string;
 }
 

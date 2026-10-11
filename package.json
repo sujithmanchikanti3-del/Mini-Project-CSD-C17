@@ -2,7 +2,11 @@
   "name": "security-architecture-assessment",
   "displayName": "Security Architecture Assessment",
   "description": "Explainable, STRIDE-based security architecture assessment for VS Code workspaces.",
-  "version": "0.3.0",
+  "repository": {
+  "type": "git",
+  "url": "https://github.com/sujithmanchikanti3-del/Mini-Project-CSD-C17.git"
+},
+  "version": "0.4.0",
   "publisher": "sujithmanchikanti3-del",
   "private": true,
   "engines": {
@@ -27,7 +31,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test test/v02-regression.test.js test/v03-technology.test.js"
+    "test": "npm run compile && node --test test/v02-regression.test.js test/v03-technology.test.js test/v04-architecture.test.js test/v04-audit.test.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

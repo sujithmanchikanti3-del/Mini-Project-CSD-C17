@@ -1,0 +1,10 @@
+# Files excluded from the packaged extension (.vsix). Runtime dependencies in node_modules are still included.
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+tsconfig.json
+package-lock.json
+.gitignore
+**/*.map
+**/*.ts

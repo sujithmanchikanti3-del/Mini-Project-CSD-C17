@@ -1,17 +1,19 @@
 import * as vscode from 'vscode';
 import { analyzeProject } from './analyzeProject';
+import { formatArchitectureReport, formatArchitectureSummary } from './architecture/formatArchitectureModel';
 import { formatScanReport, formatScanSummary } from './scanner/formatScanResult';
 import { formatTechnologyReport, formatTechnologySummary } from './scanner/technology/formatTechnologyInventory';
+import { sanitizeErrorMessage, stripControlCharacters } from './common/sanitize';
 import { WorkspaceScanError } from './scanner/types';
 
 /**
- * V0.3 — Technology / Dependency / Version Detection (on top of the V0.2 Workspace Scanner)
+ * V0.4 — Structured Security Architecture Model (on top of V0.2 scan and V0.3 technology detection)
  *
  * Command flow:
- *   VS Code Command -> V0.2 Workspace Scan -> V0.3 Technology Detection -> Result Display
+ *   VS Code Command -> V0.2 Workspace Scan -> V0.3 Technology Detection -> V0.4 Architecture Model -> Result Display
  *
- * Deliberately NOT implemented (future milestones): architecture model, STRIDE,
- * NVD/CVE, risk engine, XAI, LLM, database, dashboard, reports, Vision AI.
+ * Deliberately NOT implemented (future milestones): STRIDE, NVD/CVE, risk engine, XAI,
+ * LLM, database, dashboard, reports, Vision AI.
  */
 
 let outputChannel: vscode.OutputChannel;
@@ -28,7 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
     try {
       await runAnalyzeProjectCommand();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = sanitizeErrorMessage(error);
       log(`ERROR: ${message}`);
       vscode.window.showErrorMessage(`Security Architecture: ${message}`);
     }
@@ -64,28 +66,67 @@ async function runAnalyzeProjectCommand(): Promise<void> {
     return;
   }
 
-  log(`Scanning workspace: ${folder.uri.fsPath}`);
+  log(`Scanning workspace "${folder.name}".`);
 
   try {
-    const { scan, technology } = await analyzeProject(folder.uri.fsPath, folder.name);
+    const { scan, technology, architecture } = await analyzeProject(folder.uri.fsPath, folder.name);
+
+    // Each section is rendered independently: a failure in a later section must not hide earlier valid results.
+    const reportLines = [
+      ...renderSection('Workspace scan', () => formatScanReport(scan)),
+      '',
+      ...renderSection('Technology / dependency detection', () => formatTechnologyReport(technology)),
+      '',
+      ...renderSection('Architecture model', () => formatArchitectureReport(architecture)),
+    ];
 
     outputChannel.clear();
-    for (const line of [...formatScanReport(scan), '', ...formatTechnologyReport(technology)]) {
-      outputChannel.appendLine(line);
+    for (const line of reportLines) {
+      // Names come from the scanned project (untrusted): no embedded newlines/escape codes in the output.
+      outputChannel.appendLine(stripControlCharacters(line));
     }
     outputChannel.show(true); // reveal without stealing editor focus
 
     // Keep the report clean: post-scan diagnostics go to the Debug Console, not the channel.
-    console.log(`[Security Architecture] Scan finished: ${scan.fileCount} files, ${scan.directoryCount} directories, ${technology.dependencies.length} dependencies.`);
+    console.log(`[Security Architecture] Scan finished: ${scan.fileCount} files, ${scan.directoryCount} directories, ${technology.dependencies.length} dependencies, ${architecture.components.length} components.`);
 
-    vscode.window.showInformationMessage(`${formatScanSummary(scan)} ${formatTechnologySummary(technology)}`);
+    vscode.window.showInformationMessage(
+      stripControlCharacters(
+        [
+          renderText(() => formatScanSummary(scan)),
+          renderText(() => formatTechnologySummary(technology)),
+          renderText(() => formatArchitectureSummary(architecture)),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      )
+    );
   } catch (error) {
     if (error instanceof WorkspaceScanError) {
-      log(`ERROR: ${error.message}`);
-      vscode.window.showErrorMessage(`Security Architecture: ${error.message}`);
+      const message = sanitizeErrorMessage(error);
+      log(`ERROR: ${message}`);
+      vscode.window.showErrorMessage(`Security Architecture: ${message}`);
       return;
     }
     throw error; // unexpected: handled by the command wrapper
+  }
+}
+
+/** Build one report section; if formatting fails, say so in place of the section instead of losing the whole report. */
+function renderSection(title: string, build: () => string[]): string[] {
+  try {
+    return build();
+  } catch (error) {
+    console.error(`[Security Architecture] Could not format "${title}": ${sanitizeErrorMessage(error)}`);
+    return [`${title}: this section could not be displayed (${sanitizeErrorMessage(error)}).`];
+  }
+}
+
+function renderText(build: () => string): string {
+  try {
+    return build();
+  } catch {
+    return '';
   }
 }
 

@@ -1,4 +1,5 @@
-import { DetectedTechnology, ManifestParser, emptyOutput } from '../types';
+import { redactCredentials } from '../../../common/sanitize';
+import { DetectedTechnology, ManifestParser, TechnologyScope, emptyOutput } from '../types';
 
 /* ============================== image references ============================== */
 
@@ -26,19 +27,22 @@ export function parseImageReference(ref: string): ImageReference {
   return { name: rest, tag: null, digest };
 }
 
-function toTechnology(ref: string, source: string, extraNote?: string): DetectedTechnology {
+function toTechnology(rawRef: string, source: string, scope: TechnologyScope): DetectedTechnology {
+  const ref = redactCredentials(rawRef);
   const parsed = parseImageReference(ref);
   const notes: string[] = [];
+  if (ref !== rawRef) notes.push('credentials in the image reference were redacted');
   if (parsed.tag === null && parsed.digest === null) notes.push('no tag (Docker treats this as "latest")');
   if (parsed.tag === null && parsed.digest !== null) notes.push('pinned by digest');
   if (/\$\{?\w/.test(ref)) notes.push('uses a variable; value not resolved');
-  if (extraNote) notes.push(extraNote);
+  notes.push(scope.kind === 'build-stage' ? `build stage ${scope.index}` : `service "${scope.name}"`);
   return {
     name: parsed.name,
     version: parsed.tag ?? parsed.digest,
     ecosystem: 'Docker',
     source,
     reference: ref,
+    scope,
     ...(notes.length > 0 ? { notes: notes.join('; ') } : {}),
   };
 }
@@ -80,7 +84,7 @@ export const parseDockerfile: ManifestParser = (content, source) => {
     if (image.toLowerCase() === 'scratch' || isEarlierStage) {
       continue;
     }
-    out.technologies.push(toTechnology(image, source, `build stage ${stageNumber}`));
+    out.technologies.push(toTechnology(image, source, { kind: 'build-stage', index: stageNumber }));
   }
   return out;
 };
@@ -135,7 +139,7 @@ export const parseCompose: ManifestParser = (content, source) => {
     if (image && currentService !== undefined && indent === propertyIndent) {
       const ref = image[1].trim().replace(/^["']|["']$/g, '');
       if (ref !== '') {
-        out.technologies.push(toTechnology(ref, source, `service "${currentService}"`));
+        out.technologies.push(toTechnology(ref, source, { kind: 'service', name: currentService }));
       }
     }
   }

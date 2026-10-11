@@ -1,3 +1,5 @@
+import { sanitizeErrorMessage } from '../../../common/sanitize';
+
 /** Small helpers shared by the manifest parsers. */
 
 export function stripBom(text: string): string {
@@ -14,5 +16,5 @@ export function firstLine(message: string): string {
 }
 
 export function describeError(error: unknown): string {
-  return firstLine(error instanceof Error ? error.message : String(error));
+  return sanitizeErrorMessage(error); // first line only, absolute paths redacted
 }

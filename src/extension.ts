@@ -2,17 +2,19 @@ import * as vscode from 'vscode';
 import { analyzeProject } from './analyzeProject';
 import { formatArchitectureReport, formatArchitectureSummary } from './architecture/formatArchitectureModel';
 import { formatScanReport, formatScanSummary } from './scanner/formatScanResult';
+import { formatStrideReport, formatStrideSummary } from './stride/formatStrideAnalysis';
 import { formatTechnologyReport, formatTechnologySummary } from './scanner/technology/formatTechnologyInventory';
 import { sanitizeErrorMessage, stripControlCharacters } from './common/sanitize';
 import { WorkspaceScanError } from './scanner/types';
 
 /**
- * V0.4 — Structured Security Architecture Model (on top of V0.2 scan and V0.3 technology detection)
+ * V0.5 — Deterministic STRIDE threat analysis (on top of V0.2 scan, V0.3 detection and V0.4 model)
  *
  * Command flow:
- *   VS Code Command -> V0.2 Workspace Scan -> V0.3 Technology Detection -> V0.4 Architecture Model -> Result Display
+ *   VS Code Command -> V0.2 Workspace Scan -> V0.3 Technology Detection -> V0.4 Architecture Model
+ *                   -> V0.5 STRIDE Analysis -> Result Display
  *
- * Deliberately NOT implemented (future milestones): STRIDE, NVD/CVE, risk engine, XAI,
+ * Deliberately NOT implemented (future milestones): risk scoring, NVD/CVE, XAI,
  * LLM, database, dashboard, reports, Vision AI.
  */
 
@@ -69,7 +71,7 @@ async function runAnalyzeProjectCommand(): Promise<void> {
   log(`Scanning workspace "${folder.name}".`);
 
   try {
-    const { scan, technology, architecture } = await analyzeProject(folder.uri.fsPath, folder.name);
+    const { scan, technology, architecture, stride } = await analyzeProject(folder.uri.fsPath, folder.name);
 
     // Each section is rendered independently: a failure in a later section must not hide earlier valid results.
     const reportLines = [
@@ -78,6 +80,8 @@ async function runAnalyzeProjectCommand(): Promise<void> {
       ...renderSection('Technology / dependency detection', () => formatTechnologyReport(technology)),
       '',
       ...renderSection('Architecture model', () => formatArchitectureReport(architecture)),
+      '',
+      ...renderSection('STRIDE threat analysis', () => formatStrideReport(stride)),
     ];
 
     outputChannel.clear();
@@ -88,7 +92,7 @@ async function runAnalyzeProjectCommand(): Promise<void> {
     outputChannel.show(true); // reveal without stealing editor focus
 
     // Keep the report clean: post-scan diagnostics go to the Debug Console, not the channel.
-    console.log(`[Security Architecture] Scan finished: ${scan.fileCount} files, ${scan.directoryCount} directories, ${technology.dependencies.length} dependencies, ${architecture.components.length} components.`);
+    console.log(`[Security Architecture] Scan finished: ${scan.fileCount} files, ${scan.directoryCount} directories, ${technology.dependencies.length} dependencies, ${architecture.components.length} components, ${stride.threats.length} candidate threats.`);
 
     vscode.window.showInformationMessage(
       stripControlCharacters(
@@ -96,6 +100,7 @@ async function runAnalyzeProjectCommand(): Promise<void> {
           renderText(() => formatScanSummary(scan)),
           renderText(() => formatTechnologySummary(technology)),
           renderText(() => formatArchitectureSummary(architecture)),
+          renderText(() => formatStrideSummary(stride)),
         ]
           .filter(Boolean)
           .join(' ')
